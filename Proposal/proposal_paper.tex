@@ -1,0 +1,86 @@
+\documentclass[10pt,twocolumn]{article}
+\usepackage{times}
+\usepackage[margin=0.75in,top=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{nicefrac}
+\usepackage{multirow}
+
+\setlength{\columnsep}{0.25in}
+
+\title{\textbf{Does Conformal Selection Control False Discoveries in Structure-Based Virtual Screening Under Real Distribution Shift?}}
+
+\author{
+  Taiwo Olabamipe \\
+  Computer Science \\
+  University of Central Florida \\
+  CAP 6545 FINAL PROJECT PROPOSAL (PUBLICATION-TRACK VERSION) \\
+  \texttt{tal17847@ucf.edu}
+}
+
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Proposed Topic}
+
+Virtual screening uses a trained model to shortlist compounds whose binding affinity to a protein is predicted to be high, so that only those are tested in the lab. The cost of a wrong shortlist is wasted experiments, so the useful guarantee is not an accurate prediction for each compound but a bound on the share of the shortlist that turns out to be inactive, the false discovery rate (FDR). Conformal selection provides such a bound: it turns a model's predictions and a labeled calibration set into p-values, one per candidate, and applies the Benjamini--Hochberg procedure so that the expected fraction of false selections stays below a chosen level $q$, with no assumption on the model~\cite{jin2023}. The guarantee requires the calibration and candidate compounds to be exchangeable, and virtual screening violates this, because new candidates come from new targets and new chemistry. A weighted version corrects for a known covariate shift by reweighting the calibration data~\cite{jin2026}, but the weights must be estimated in practice, and the guarantee is lost if the estimate is poor. Related work exists on each piece. Conformal selection has been applied to compound screening~\cite{bai2025}; weighted conformal prediction has been adapted to drug property prediction~\cite{codrug2023}; and conformal prediction under covariate shift has been analyzed for biomolecular design~\cite{fannjiang2022}. Uncertainty estimation for structure-based affinity models under leak-free splits has been studied without conformal methods~\cite{rayka2025}. In the literature I searched, I did not find an evaluation of whether FDR control holds for structure-based affinity models across the leak-free LP-PDBBind splits~\cite{lppdbbind}, the independent BDB2020+ set, and a peptide-ligand shift set, and this claim is limited to my search. A pilot on the real LP-PDBBind table motivates the question. It used a deliberately weak ligand-only random forest (RMSE about 1.7 pK units) and one calibration draw, so it is only suggestive. Selecting complexes with $\text{pK}>7$ by thresholding the predicted value gave a false discovery proportion of 37\% among 346 selections, far above a 10\% target. Unweighted conformal selection at a 10\% target selected nothing at that threshold because the model was too weak, and at the lower threshold $\text{pK}>6$ it returned a proportion of 14\% with 24\% power, slightly above the target, and at $\text{pK}>7$ with a 30\% target it returned 42.5\%, again above the target. One draw cannot say whether such gaps are chance, so the project repeats every setting over hundreds of calibration resamples.
+
+The project asks three questions. \textbf{(Q1, benchmark)} Across two structure-based model families, three test sets, and several thresholds, when does unweighted conformal selection keep FDR below the target, and when does it not? \textbf{(Q2, method)} The weighted procedure needs the density ratio between calibration and test compounds, which is hard to estimate from the high-dimensional ECIF features. I propose \emph{novelty-aware weights}, a domain classifier trained on a few low-dimensional descriptors of how novel a complex is relative to the training set (highest ligand Tanimoto similarity to any training ligand, highest protein sequence identity to any training protein, and the model's predictive spread), instead of the raw features. My hypothesis is that these weights give more stable FDR control at a smaller loss in power than a domain classifier on raw features or a kernel-density-ratio estimate in the style of CoDrug~\cite{codrug2023}. This hypothesis may be wrong, and the project is designed so that the benchmark (Q1) and the comparison of weight estimators stand as results if it is. \textbf{(Q3, decision)} At equal target $q$, how many truly active compounds does each procedure find compared with naive thresholding, and how many false selections does each let through? I fix the success criteria in advance. FDR is declared controlled in one setting if the upper end of the 95\% bootstrap interval for the mean false discovery proportion over 200 calibration resamples is at most $q$. The method claim holds if novelty-aware weights control FDR in more settings than each baseline, and in the settings where both control it, their median power is at least 80\% of the best baseline's. If neither holds, I report the benchmark and the negative result. I also state the main assumption: weighted conformal selection assumes the relationship between structure and affinity is the same in calibration and test data, and this may fail across the assay types in BDB2020+ and PDBbind, so I will report results by test set.
+
+\section{Data and Resource Availability}
+
+All data are public, and I downloaded and checked the split table and the peptide set. The training, validation, and test sets come from LP-PDBBind~\cite{lppdbbind}, whose split table (pdbid, split, ligand SMILES, protein sequence, affinity, cleanliness flags) is in the authors' public repository, \url{https://github.com/THGLab/LP-PDBBind}, along with scripts to retrain IGN, RF-Score, DeepDTA, and AutoDock Vina. The earlier study trains on non-covalent complexes at cleaning level 1 and validates and tests on those at level 2, and reports 7,259 / 944 / 2,163 complexes~\cite{rayka2025}. That filter gives 7,393 / 958 / 2,171. The Peptides-Holdout benchmark (Zenodo record 8410136, file \texttt{peptides\_holdout\_test.csv}) released with the ToolBoxSF study~\cite{durant2025} has 2,573 PDBbind v2020 complexes with peptide ligands and affinities. All are also in the LP-PDBBind table, and 134 of them are among the 7,393 training complexes. Removing them gives exactly 7,259, so the earlier study evidently removed the overlap. I do the same for all splits, which leaves 7,259 / 947 / 2,166 (the validation and test counts differ from the published values by three complexes each, and I report the counts I obtain), and I drop the 75 covalent peptide complexes, leaving 2,498. The structure files come from PDBbind~\cite{pdbbind}, free to academic users after registering and accepting a license agreement, which I will do in the first week. The third test set is BDB2020+, 111 complexes in a 35\,MB archive in the LP-PDBBind repository. The shift is real in the labels too: the share of complexes above pK 7 is 43\% in the LP-PDBBind test set and 21\% in the peptide set (and 8\% above pK 8, or about 205 complexes), so the three test sets stress the selection procedure differently. Because the BDB2020+ set is small, the 95\% binomial interval on a measured FDR is wide, and I will report it as descriptive. The models are (1) a feed-forward network on Extended Connectivity Interaction Features (ECIF)~\cite{ecif}, the best model in the earlier study, whose MIT-licensed code implements only Bayes by Backprop (\url{https://github.com/miladrayka/uncertainty_quantification}), so I will write the deterministic and ensemble versions myself, and (2) IGN, a graph network, as retrained in the LP-PDBBind repository. Conformal selection is a few lines (conformal p-values, then Benjamini--Hochberg), which I already implemented in the pilot. The authors' package (\url{https://github.com/ying531/conformal-selection}) states no license, so I use it only to cross-check my implementation, not to copy code. I have HiPerGator access, which I will use for training over multiple seeds and the resampling experiments, which run several thousand selections. Boltz-2 and other preprint-only models are excluded, because I restrict the project's literature and baselines to published work. If IGN is not training correctly by October 27, meaning its test RMSE is not close to the value reported in the LP-PDBBind paper, I will replace it with a gradient-boosted-tree model on ECIF features, so that the benchmark still covers two model families.
+
+\section{Weekly Schedule}
+
+The project runs from the proposal to the presentation in the week of December 1 and the final report due December 8 at 3\,PM. Weeks 1 to 4 build and validate both models. Weeks 5 to 8 run the conformal-selection experiments and the proposed weights. The remaining time is for the analysis and writing. There are 36 settings in the full grid (2 models, 3 test sets, 3 thresholds at pK 6, 7, 8, and 2 targets, $q$ of 0.1 and 0.2). If I fall behind, I will cut the threshold pK 6 first, then the second model, and I will not cut the unweighted benchmark (Q1) or the comparison of weight estimators (Q2).
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.3cm}>{\raggedright\arraybackslash}p{6.6cm}@{}}
+  \toprule
+  Week of & Milestone \\
+  \midrule
+  Sep 29 & Submit proposal. Register for PDBbind. Clone the LP-PDBBind and uncertainty repositories. Build the splits with the filters above and record their sizes. \\
+  Oct 6  & Compute ECIF features. Extract BDB2020+ and the peptide set. Set up the HiPerGator environment. \\
+  Oct 13 & Train the deterministic FFNN-ECIF and check its test RMSE and Pearson $r$ against the published values~\cite{rayka2025}. \\
+  Oct 20 & Get IGN training working with the LP-PDBBind scripts. Train 5 seeds of FFNN-ECIF. \\
+  Oct 27 & IGN decision point: keep IGN or switch to gradient-boosted trees. Train the second model. \\
+  Nov 3  & Unweighted conformal selection and the naive-threshold baseline over 200 calibration resamples for all settings. Answer Q1. \\
+  Nov 10 & Weighted selection with domain-classifier weights on raw features, and with kernel-density weights. \\
+  Nov 17 & Novelty-aware weights. Compare all weight estimators (Q2) and power against naive thresholding (Q3). Begin the report. \\
+  Nov 24 & Thanksgiving week. Finish the remaining runs and figures. Light workload. \\
+  Dec 1  & Give the final presentation (last class Dec 3). Complete the report draft. \\
+  Dec 8  & Submit the final report and code by 3\,PM. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{99}
+\small
+\bibitem{jin2023} Jin, Y.\ and Cand{\`e}s, E.\,J. Selection by Prediction with Conformal p-values. \emph{Journal of Machine Learning Research} 24(244):1--41, 2023. \url{https://jmlr.org/papers/volume24/22-1176/22-1176.pdf}
+\bibitem{jin2026} Jin, Y.\ and Cand{\`e}s, E.\,J. Model-free selective inference under covariate shift via weighted conformal p-values. \emph{Biometrika} 113(1):asaf066, 2026. \url{https://academic.oup.com/biomet/article-abstract/113/1/asaf066/8250683}
+\bibitem{bai2025} Bai, T.\ et al. Conformal Selection for Efficient and Accurate Compound Screening in Drug Discovery. \emph{Journal of Chemical Information and Modeling} 65(24):13070--13085, 2025. \url{https://pubmed.ncbi.nlm.nih.gov/41363967/}
+\bibitem{codrug2023} Laghuvarapu, S., Lin, Z., and Sun, J. CoDrug: Conformal Drug Property Prediction with Density Estimation under Covariate Shift. \emph{Advances in Neural Information Processing Systems} 36, 2023. \url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/7691484a7a35d5e2742279c1d926b778-Abstract-Conference.html}
+\bibitem{fannjiang2022} Fannjiang, C., Bates, S., Angelopoulos, A.\,N., Listgarten, J., and Jordan, M.\,I. Conformal prediction under feedback covariate shift for biomolecular design. \emph{Proceedings of the National Academy of Sciences} 119(43), 2022. \url{https://doi.org/10.1073/pnas.2204569119}
+\bibitem{rayka2025} Rayka, M.\ and Naghavi, S.\,S. Uncertainty quantification enables reliable deep learning for protein--ligand binding affinity prediction. \emph{Scientific Reports} 15:43156, 2025. \url{https://doi.org/10.1038/s41598-025-27167-7}
+\bibitem{lppdbbind} Li, J., Guan, X., Zhang, O., Sun, K., Wang, Y., Bagni, D., and Head-Gordon, T. Leak Proof PDBBind: A Reorganized Data Set of Protein--Ligand Complexes for More Generalizable Binding Affinity Prediction. \emph{The Journal of Physical Chemistry B} 130:730--740, 2026. \url{https://doi.org/10.1021/acs.jpcb.5c08598}
+\bibitem{durant2025} Durant, G., Boyles, F., Birchall, K., Marsden, B., and Deane, C.\,M. Robustly interrogating machine learning-based scoring functions: what are they learning? \emph{Bioinformatics} 41(2):btaf040, 2025. \url{https://academic.oup.com/bioinformatics/article/41/2/btaf040/7985708}
+\bibitem{ecif} S{\'a}nchez-Cruz, N.\ et al. Extended connectivity interaction features: improving binding affinity prediction through chemical description. \emph{Bioinformatics} 37:1376--1382, 2021. \url{https://doi.org/10.1093/bioinformatics/btaa982}
+\bibitem{pdbbind} PDB-wide collection of binding data: current status of the PDBbind database. \emph{Bioinformatics} 31(3):405, 2015. \url{https://academic.oup.com/bioinformatics/article/31/3/405/2365195}
+\end{thebibliography}
+
+\end{document}

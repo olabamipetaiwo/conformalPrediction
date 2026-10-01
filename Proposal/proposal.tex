@@ -1,0 +1,66 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+
+\title{CAP 6545 Final Project Proposal\\[0.4em]
+  \large Do Conformal Prediction Intervals Stay Valid Under Distribution Shift?\\
+  A Leak-Free Study of Protein--Ligand Binding Affinity Prediction}
+\author{Taiwo Olabamipe}
+\date{Due September 29, 2026}
+
+\begin{document}
+
+\maketitle
+
+\section*{Proposed Topic}
+
+Predicting how tightly a small molecule binds to a protein target is central to early-stage drug discovery, because it decides which compounds are worth synthesizing and testing. A prediction is only useful if the chemist also knows how far to trust it. Split conformal prediction offers this: it wraps any trained model in prediction intervals with a finite-sample guarantee that a chosen fraction (for example 90\%) of true values fall inside~\cite{angelopoulos2023}. The guarantee holds only if calibration and test data are exchangeable, and drug discovery routinely violates this, since new targets and new chemistry differ from the training data. Related work exists, and this project is an empirical extension of it, not a new method. Conformal prediction has been applied to binding affinity models and kept validity on one external target but not another~\cite{parks2020}; it has been tested on scenarios with novel compounds and targets for kinase data, without PDBbind~\cite{orsolic2023}; and reweighting calibration data under covariate shift is established~\cite{tibshirani2019} and has been adapted to drug property prediction~\cite{codrug2023}. Separately, uncertainty estimates for structure-based binding affinity models degrade as test data shifts from the training data on the leak-free LP-PDBBind splits~\cite{rayka2025,lppdbbind}, but that study did not use conformal prediction. In the literature I searched, I did not find conformal intervals evaluated for structure-based models on LP-PDBBind, the independent BDB2020+ set, or a peptide-ligand shifted set; this claim is limited to my search. A pilot on the real LP-PDBBind table shows why the question is worth asking. Using a deliberately weak ligand-only random forest (RMSE about 1.7 pK units, not the model proposed below), split conformal intervals calibrated on the LP-PDBBind validation set covered 90.3\% of test complexes at a 90\% target, but intervals calibrated on a random hold-out of the training set covered only 82.3\% (95\% bootstrap interval 80.6--83.9\%), and normalizing by the forest's predictive spread brought coverage back to 89.8\%. The project asks three questions on the proposed model. \textbf{(Q1)} How does the choice of calibration set (a random training hold-out versus the LP-PDBBind validation set) change coverage on the LP-PDBBind test set, BDB2020+, and a peptide-ligand set? \textbf{(Q2)} Does normalizing intervals by each method's predictive uncertainty (deep ensemble, Monte Carlo dropout, Bayes by Backprop) keep coverage at the target under shift while staying narrow? \textbf{(Q3)} Does weighted conformal prediction recover coverage that the other choices lose on the shifted sets? A result of no problem is a valid finding, since the pilot also showed coverage holding on some subsets. The result is useful whichever way it goes: a broken guarantee is a practical warning for anyone using such models on new targets, and a repaired one is a usable recipe.
+
+\section*{Data and Resource Availability}
+
+All data are public, and I downloaded and checked the split table and the peptide set. The training, validation, and test sets come from LP-PDBBind~\cite{lppdbbind}, whose split table (pdbid, split, ligand SMILES, protein sequence, affinity, cleanliness flags) is in the authors' public repository, \url{https://github.com/THGLab/LP-PDBBind}. The earlier study trains on non-covalent complexes at cleaning level 1 and validates and tests on those at level 2~\cite{rayka2025}. It reports 7,259 training, 944 validation, and 2,163 test complexes, and I reconciled these counts against the table. Applying that filter gives 7,393 / 958 / 2,171. The Peptides-Holdout benchmark, released with the ToolBoxSF study~\cite{durant2025} (Zenodo record 8410136, file \texttt{peptides\_holdout\_test.csv}), has 2,573 PDBbind v2020 complexes with peptide ligands and experimental affinities, all of which are also in the LP-PDBBind table. Of the 7,393 training complexes, exactly 134 are in the peptide set, and removing them gives exactly 7,259, so the earlier study evidently removed the overlap. I will do the same: I remove every peptide-set complex from the training, validation, and test splits (which leaves 7,259 / 947 / 2,166, within three complexes of the published validation and test counts, and I will report the counts I actually obtain). I drop the 75 covalent peptide complexes, which leaves 2,498 (the earlier study reports 2,503). The structure files come from PDBbind~\cite{pdbbind}, which is free to academic users after registering and accepting a license agreement; I will register in the first week. The shifted test sets are therefore (a) the peptide set, whose mean affinity (5.85 pK units) is lower than the training set's (6.21), and (b) BDB2020+ (111 complexes, in the LP-PDBBind repository). Test-set size limits what I can claim: the 95\% binomial interval on measured coverage at a 90\% target is about $\pm$5.6 points for the 111 BDB2020+ complexes, $\pm$1.3 for the LP-PDBBind test set, and $\pm$1.2 for the peptide set. So on BDB2020+ I can only detect under-coverage larger than about 6 points, and I will say so; the 22-complex EGFR and 27-complex M$^{\text{pro}}$ sets~\cite{rayka2025} are too small for coverage claims and I will use them descriptively only. The model is a feed-forward network on Extended Connectivity Interaction Features (ECIF)~\cite{ecif}, the best-performing model in the earlier study. Its authors' MIT-licensed code implements only the Bayes by Backprop variant (\url{https://github.com/miladrayka/uncertainty_quantification}), so I will implement the deterministic, ensemble, and MC-dropout versions myself. This network is small, so the whole study is computationally cheap. I have HiPerGator access, which I will use to train ensemble members and repeat every experiment over multiple random seeds, so that differences between methods are not noise from one run. Boltz-2 and other preprint-only models are excluded, because I restrict the project's literature and baselines to published work.
+
+\section*{Weekly Schedule}
+
+The project runs from the proposal to the presentation in the week of December 1 and the final report due December 8 at 3\,PM. Weeks 1 to 3 build and validate the baseline, because a wrong data pipeline is the main risk. Weeks 4 to 7 answer Q1 to Q3. The remaining weeks are for the selective-prediction analysis, robustness checks, and writing. If I fall behind, I will drop the Bayes by Backprop variant first, then the selective-prediction analysis, and keep Q1 and Q3, which are the core.
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{13.6cm}@{}}
+  \toprule
+  Week of & Milestone \\
+  \midrule
+  Sep 29 & Submit proposal. Register for PDBbind. Clone the LP-PDBBind and uncertainty repositories. Download the peptide set and apply the overlap removal described above. Read the full text of the closest conformal work~\cite{parks2020,orsolic2023,codrug2023} and write down what it does and does not cover. \\
+  Oct 6  & Compute ECIF features for all complexes. Build the training, validation, and test splits with the filters above and record their sizes. Set up the HiPerGator environment. \\
+  Oct 13 & Train the deterministic FFNN-ECIF. Check that test RMSE and Pearson $r$ are close to the published values~\cite{rayka2025}. Do not proceed until they are. \\
+  Oct 20 & Add deep ensemble and MC dropout. Run the Bayes by Backprop code from the repository. Train 5 seeds of each. \\
+  Oct 27 & Implement split conformal prediction with absolute-residual scores, calibrated once on a random training hold-out and once on the validation split. Answer Q1: coverage and width at 90\% on the test set, BDB2020+, and the peptide set, with bootstrap intervals. \\
+  Nov 3  & Add uncertainty-normalized conformal scores for each method. Answer Q2: compare interval width at equal coverage. \\
+  Nov 10 & Implement weighted conformal prediction with a domain classifier for the density ratio. Answer Q3: does coverage on the shifted set recover, and how unstable are the weights? \\
+  Nov 17 & Selective-prediction analysis: RMSE as the least-certain predictions are removed, and rank correlation between uncertainty and error. Begin the report. \\
+  Nov 24 & Thanksgiving week. Finish remaining runs and figures. Light workload. \\
+  Dec 1  & Give the final presentation (last class Dec 3). Complete the report draft. \\
+  Dec 8  & Submit the final report and code by 3\,PM. \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\begin{thebibliography}{99}
+\bibitem{angelopoulos2023} Angelopoulos, A.\,N.\ and Bates, S. Conformal Prediction: A Gentle Introduction. \emph{Foundations and Trends in Machine Learning} 16(4):494--591, 2023. \url{https://doi.org/10.1561/2200000101}
+\bibitem{rayka2025} Rayka, M.\ and Naghavi, S.\,S. Uncertainty quantification enables reliable deep learning for protein--ligand binding affinity prediction. \emph{Scientific Reports} 15:43156, 2025. \url{https://doi.org/10.1038/s41598-025-27167-7}
+\bibitem{lppdbbind} Li, J., Guan, X., Zhang, O., Sun, K., Wang, Y., Bagni, D., and Head-Gordon, T. Leak Proof PDBBind: A Reorganized Data Set of Protein--Ligand Complexes for More Generalizable Binding Affinity Prediction. \emph{The Journal of Physical Chemistry B} 130:730--740, 2026. \url{https://doi.org/10.1021/acs.jpcb.5c08598}
+\bibitem{parks2020} Parks, C., Gaieb, Z., and Amaro, R.\,E. An Analysis of Proteochemometric and Conformal Prediction Machine Learning Protein--Ligand Binding Affinity Models. \emph{Frontiers in Molecular Biosciences} 7:93, 2020. \url{https://doi.org/10.3389/fmolb.2020.00093}
+\bibitem{orsolic2023} Or{\v s}oli{\'c}, D.\ and {\v S}muc, T. Dynamic applicability domain (dAD): compound--target binding affinity estimates with local conformal prediction. \emph{Bioinformatics} 39(8):btad465, 2023. \url{https://doi.org/10.1093/bioinformatics/btad465}
+\bibitem{tibshirani2019} Tibshirani, R.\,J., Barber, R.\,F., Cand{\`e}s, E., and Ramdas, A. Conformal Prediction Under Covariate Shift. \emph{Advances in Neural Information Processing Systems} 32, 2019. \url{https://proceedings.neurips.cc/paper/2019/hash/8fb21ee7a2207526da55a679f0332de2-Abstract.html}
+\bibitem{codrug2023} Laghuvarapu, S., Lin, Z., and Sun, J. CoDrug: Conformal Drug Property Prediction with Density Estimation under Covariate Shift. \emph{Advances in Neural Information Processing Systems} 36, 2023. \url{https://proceedings.neurips.cc/paper_files/paper/2023/hash/7691484a7a35d5e2742279c1d926b778-Abstract-Conference.html}
+\bibitem{durant2025} Durant, G., Boyles, F., Birchall, K., Marsden, B., and Deane, C.\,M. Robustly interrogating machine learning-based scoring functions: what are they learning? \emph{Bioinformatics} 41(2):btaf040, 2025. \url{https://academic.oup.com/bioinformatics/article/41/2/btaf040/7985708}
+\bibitem{ecif} S{\'a}nchez-Cruz, N.\ et al. Extended connectivity interaction features: improving binding affinity prediction through chemical description. \emph{Bioinformatics} 37:1376--1382, 2021. \url{https://doi.org/10.1093/bioinformatics/btaa982}
+\bibitem{pdbbind} PDB-wide collection of binding data: current status of the PDBbind database. \emph{Bioinformatics} 31(3):405, 2015. \url{https://academic.oup.com/bioinformatics/article/31/3/405/2365195}
+\end{thebibliography}
+
+\end{document}

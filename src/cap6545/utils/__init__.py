@@ -1,0 +1,3 @@
+from cap6545.utils.paths import DATA_DIR, EXTERNAL_DIR, PROJECT_ROOT, RAW_DIR
+
+__all__ = ["DATA_DIR", "EXTERNAL_DIR", "PROJECT_ROOT", "RAW_DIR"]
