@@ -49,7 +49,7 @@ Course: Machine Learning Methods for Biomedical Data (UCF, Fall 2026, Dr. Haiyan
 ### Project tasks
 - [x] Choose the topic
 - [x] HiPerGator access (already have it)
-- [ ] Register for PDBbind (free for academics) to get the structure files
+- [x] Register for PDBbind (free for academics) to get the structure files
 - [x] Peptide set found: Zenodo 8410136, `toolboxsf_benchmarks.zip` -> `csv_files/peptides_holdout_test.csv` (2,573 rows; 2,498 after dropping covalent)
 - [x] Split sizes reconciled: CL1 train (non-covalent) minus the 134 peptide-set overlaps = 7,259, matching the published count exactly; val/test after removing peptide-set overlaps = 947 / 2,166 (published 944 / 2,163, 3 apart each)
 - [ ] Download the peptide CSV and PDBbind structures once registered (pilot data and scripts are in the session scratchpad only)
