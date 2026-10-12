@@ -1,0 +1,20 @@
+# Deterministic FFNN baseline (Rayka & Naghavi 2025 reproduction).
+# SLURM array jobs override only `seed` via `--seed`.
+seed: 0
+standardization: fit          # fit on our train split; "published" = authors' stats
+pdbbind_root: data/raw/pdbbind
+features_cache: data/processed/ecif
+output_dir: runs/smoke
+
+model:
+  in_features: 790
+  hidden_units: [900, 300]
+  dropout: 0.4
+  activation: elu
+
+optim:
+  optimizer: rmsprop
+  lr: 6.894932301255905e-05
+  weight_decay: 0.004423364659297819
+  batch_size: 32
+  epochs: 3
