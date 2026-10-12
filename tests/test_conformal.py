@@ -9,6 +9,7 @@ from cap6545.conformal import (
     SplitConformal,
     absolute_residual_scores,
     conformal_quantile,
+    weighted_conformal_quantile,
 )
 from cap6545.evaluation import coverage_report, empirical_coverage, mean_width
 
@@ -73,6 +74,71 @@ def test_empirical_coverage_and_report() -> None:
     assert rep.target_coverage == pytest.approx(0.9)
     assert rep.empirical_coverage == 0.5
     assert rep.mean_width == pytest.approx(2.0)
+
+
+def test_weighted_quantile_reduces_to_unweighted_with_equal_weights() -> None:
+    scores = np.arange(1, 11, dtype=float)  # n=10
+    for alpha in (0.1, 0.2, 0.5):
+        plain = conformal_quantile(scores, alpha)
+        w = weighted_conformal_quantile(
+            scores, np.ones(10), np.ones(3), alpha
+        )
+        np.testing.assert_allclose(w, plain)  # same for every test point
+
+
+def test_weighted_quantile_infinite_when_mass_only_in_atom() -> None:
+    # n=5 equal weights, alpha=0.1: unweighted would be inf; so is weighted.
+    q = weighted_conformal_quantile(np.arange(5, dtype=float), np.ones(5), np.ones(2), 0.1)
+    assert np.all(np.isinf(q))
+
+
+def test_weighted_quantile_upweighting_large_scores_raises_band() -> None:
+    scores = np.array([1.0, 2.0, 3.0, 4.0])
+    light = weighted_conformal_quantile(scores, np.array([4, 3, 2, 1.0]), np.ones(1), 0.5)
+    heavy = weighted_conformal_quantile(scores, np.array([1, 2, 3, 4.0]), np.ones(1), 0.5)
+    assert heavy[0] >= light[0]  # mass pushed toward larger scores -> wider band
+
+
+def test_weighted_quantile_validates_inputs() -> None:
+    with pytest.raises(ValueError):
+        weighted_conformal_quantile([1.0, 2.0], [1.0], [1.0], 0.1)  # mismatched shapes
+    with pytest.raises(ValueError):
+        weighted_conformal_quantile([1.0], [0.0], [1.0], 0.1)  # nonpositive weight
+    with pytest.raises(ValueError):
+        weighted_conformal_quantile([1.0], [1.0], [1.0], 1.0)  # bad alpha
+
+
+def test_weighted_conformal_restores_coverage_under_known_shift() -> None:
+    """With the true likelihood ratio as weights, coverage returns to ~1-alpha.
+
+    Calibration noise scale differs from test noise scale (a covariate shift
+    surrogate): unweighted split conformal then miscovers, weighting by the known
+    density ratio fixes it.
+    """
+    rng = np.random.default_rng(0)
+    alpha = 0.1
+    n_cal = n_test = 2000
+    # Covariate z drives both the noise scale and the sampling density.
+    # cal: z ~ U(0,1); test: z ~ Beta pushing mass to larger z (heavier noise).
+    z_cal = rng.uniform(0, 1, n_cal)
+    z_test = rng.beta(2.0, 1.0, n_test)  # density 2z on [0,1]
+
+    def scale(z: np.ndarray) -> np.ndarray:
+        return 0.5 + 2.0 * z
+
+    s_cal = np.abs(rng.standard_normal(n_cal) * scale(z_cal))
+    s_test = np.abs(rng.standard_normal(n_test) * scale(z_test))
+    # true ratio p_test/p_cal = (2 z) / 1
+    w_cal = 2.0 * z_cal
+    w_test = 2.0 * z_test
+
+    plain_q = conformal_quantile(s_cal, alpha)
+    plain_cov = float(np.mean(s_test <= plain_q))
+    wq = weighted_conformal_quantile(s_cal, w_cal, w_test, alpha)
+    weighted_cov = float(np.mean(s_test <= wq))
+
+    assert plain_cov < 1 - alpha - 0.01  # unweighted undercovers under the shift
+    assert abs(weighted_cov - (1 - alpha)) < 0.03  # weighting restores coverage
 
 
 def test_split_conformal_marginal_coverage_guarantee() -> None:
