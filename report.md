@@ -53,6 +53,8 @@ All counts are reconciled against the approved proposal and must be reproducible
 - Peptides-Holdout: Zenodo 8410136, `toolboxsf_benchmarks.zip` → `csv_files/peptides_holdout_test.csv`.
 - BDB2020+: from the LP-PDBBind repo (111 complexes).
 
+**UPDATE 2026-10-12 — PDBbind structures downloaded.** Obtained the v2020.R1 "P-L" package (19,037 complexes, the reprocessed subset surviving into v2024) as `data/raw/pdbbind/P-L.tar.gz`, verified intact (`gzip -t`) and extracted to `data/raw/pdbbind/P-L/<year-range>/<pdbid>/`. The current `structures.py` indexer handles this layout unchanged (recursive `rglob`). Coverage vs. splits: train 7,131/7,259, val 947/947, test 2,160/2,166 — **134 split complexes (128 train, 6 test) are absent** because R1 dropped ~400 deprecated v2020 complexes (missing IDs in `data/raw/pdbbind/missing_from_R1.tsv`). Decision: accept the loss and document (see CLAUDE.md "Load-bearing data counts", layer 2). Operational trainable counts are 7,131 / 947 / 2,160. Not an exact Rayka & Naghavi reproduction.
+
 ---
 
 ## 3. Current repo state

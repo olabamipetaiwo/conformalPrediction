@@ -35,9 +35,10 @@ data/interim/
 !tests/fixtures/**/*.pdb
 !tests/fixtures/**/*.mol2
 
-models/
-checkpoints/
-runs/
+# Output dirs only (anchored to repo root so src/cap6545/models/ stays tracked).
+/models/
+/checkpoints/
+/runs/
 wandb/
 mlruns/
 lightning_logs/

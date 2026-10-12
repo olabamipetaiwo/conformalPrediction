@@ -26,9 +26,8 @@ def main() -> Path:
         return target
 
     print(f"extracting {MEMBER_NAME} from {ZENODO_URL} (range requests only)")
-    with RemoteZip(ZENODO_URL) as zf:
-        with zf.open(MEMBER_NAME) as src, target.open("wb") as dst:
-            dst.write(src.read())
+    with RemoteZip(ZENODO_URL) as zf, zf.open(MEMBER_NAME) as src, target.open("wb") as dst:
+        dst.write(src.read())
     print(f"wrote {target} ({target.stat().st_size} bytes)")
     return target
 
