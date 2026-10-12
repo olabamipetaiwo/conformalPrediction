@@ -16,11 +16,14 @@ conformal variant consumes. Run as a (small) GPU SLURM job, not on a login node.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 
+from cap6545.data.bdb import load_bdb2020plus
 from cap6545.data.features import Standardizer
 from cap6545.data.splits import load_lp_pdbbind_splits
 from cap6545.data.structures import index_structures
@@ -32,6 +35,34 @@ CKPT_GLOB = "runs/deterministic/seed_*/checkpoint.pt"
 PDBBIND_ROOT = Path("data/raw/pdbbind")
 CACHE = Path("data/processed/ecif")
 OUT_DIR = Path("runs/predictions")
+
+
+def resolve_splits(names: list[str], holdout_ids: Path | None = None) -> dict[str, pd.DataFrame]:
+    """Split frames for the requested names, drawing from the right data source.
+
+    ``train``/``val``/``test``/``peptides_nc`` come from the LP-PDBBind loader;
+    ``bdb`` from the BDB2020+ shift set; ``train_holdout`` is the LP train frame
+    restricted to the Q1 calibration ids in ``holdout_ids``.
+    """
+    out: dict[str, pd.DataFrame] = {}
+    known_lp = {"train", "val", "test", "peptides_nc"}
+    need_lp = {n for n in names if n in known_lp} | ({"train"} if "train_holdout" in names else set())
+    lp: dict[str, pd.DataFrame] = {}
+    if need_lp:
+        lp, _ = load_lp_pdbbind_splits()
+    for n in names:
+        if n == "bdb":
+            out[n] = load_bdb2020plus()
+        elif n == "train_holdout":
+            if holdout_ids is None:
+                raise SystemExit("train_holdout requested but --holdout-ids not given")
+            ids = {i.lower() for i in json.loads(Path(holdout_ids).read_text())}
+            out[n] = lp["train"].loc[lp["train"].index.isin(ids)]
+        elif n in lp:
+            out[n] = lp[n]
+        else:
+            raise SystemExit(f"unknown split {n!r}; known: {sorted(known_lp)} + ['bdb','train_holdout']")
+    return out
 
 
 def load_model(ckpt_path: Path, device: torch.device) -> tuple[FFNN, Standardizer]:
@@ -61,18 +92,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--splits", nargs="+", default=["val", "test"])
     parser.add_argument("--mc-samples", type=int, default=50)
+    parser.add_argument("--ckpt-glob", default=CKPT_GLOB)
+    parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
+    parser.add_argument("--holdout-ids", type=Path, default=None,
+                        help="JSON of Q1 calibration ids, for the train_holdout split")
     args = parser.parse_args()
 
     device = default_device()
-    ckpts = sorted(Path().glob(CKPT_GLOB))
+    ckpts = sorted(Path().glob(args.ckpt_glob))
     if not ckpts:
-        raise SystemExit(f"no checkpoints under {CKPT_GLOB}; train first.")
+        raise SystemExit(f"no checkpoints under {args.ckpt_glob}; train first.")
     print(f"device={device.type} | {len(ckpts)} checkpoints")
     models = [load_model(c, device) for c in ckpts]
 
-    splits, _ = load_lp_pdbbind_splits()
+    splits = resolve_splits(args.splits, holdout_ids=args.holdout_ids)
     index = index_structures(PDBBIND_ROOT)
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for name in args.splits:
         arrays = build_split_arrays(splits[name], index, cache_dir=CACHE)
@@ -90,7 +126,10 @@ def main() -> None:
             samples=args.mc_samples,
         )
 
-        out = OUT_DIR / f"{name}.npz"
+        if arrays.missing:
+            print(f"  [{name}] {len(arrays.missing)} ids lack structures; "
+                  f"predicting on {len(arrays.ids)}.")
+        out = out_dir / f"{name}.npz"
         np.savez(
             out,
             ids=np.array(ids),

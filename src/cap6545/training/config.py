@@ -35,6 +35,12 @@ class TrainConfig(BaseModel):
     # "fit" standardizes on our own train split (no leakage); "published" uses the
     # authors' vendored mean/std for verbatim reproduction.
     standardization: Literal["fit", "published"] = "fit"
+    # Q1 training-hold-out: reserve this fraction of CL1 train as a conformal
+    # calibration partition that is NEVER trained on. 0 disables (normal training).
+    # The partition is fixed by cal_holdout_seed and shared across ensemble seeds,
+    # so every member holds out the same complexes.
+    cal_holdout_frac: float = 0.0
+    cal_holdout_seed: int = 12345
     pdbbind_root: Path = Path("data/raw/pdbbind")
     features_cache: Path = Path("data/processed/ecif")
     output_dir: Path = Path("runs")

@@ -1,0 +1,24 @@
+# Q1 training-hold-out ensemble: identical to the deterministic baseline, but
+# reserves 10% of CL1 train as a conformal calibration partition never trained on.
+# The partition is fixed by cal_holdout_seed and shared across all ensemble seeds.
+#   sbatch --array=0-9 scripts/slurm/train_q1_holdout.sh
+seed: 0
+standardization: fit
+pdbbind_root: data/raw/pdbbind
+features_cache: data/processed/ecif
+output_dir: runs/q1_holdout
+cal_holdout_frac: 0.10
+cal_holdout_seed: 12345
+
+model:
+  in_features: 790
+  hidden_units: [900, 300]
+  dropout: 0.4
+  activation: elu
+
+optim:
+  optimizer: rmsprop
+  lr: 6.894932301255905e-05
+  weight_decay: 0.004423364659297819
+  batch_size: 32
+  epochs: 300

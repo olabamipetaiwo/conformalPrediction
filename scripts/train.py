@@ -10,12 +10,37 @@ val split, and writes a checkpoint + history under ``<output_dir>/seed_<seed>/``
 from __future__ import annotations
 
 import argparse
+import json
+
+import numpy as np
 
 from cap6545.data.splits import load_lp_pdbbind_splits
 from cap6545.data.structures import index_structures
 from cap6545.training.config import TrainConfig
-from cap6545.training.dataset import build_split_arrays
+from cap6545.training.dataset import SplitArrays, build_split_arrays
 from cap6545.training.train import default_device, save_checkpoint, train_model
+
+
+def carve_calibration_holdout(
+    train: SplitArrays, frac: float, seed: int
+) -> tuple[SplitArrays, list[str]]:
+    """Split ``train`` into (kept-for-training, held-out-calibration-ids).
+
+    The partition is a deterministic function of ``seed`` and the sorted id list,
+    so it is identical across ensemble members regardless of their training seed.
+    """
+    ids_sorted = sorted(train.ids)
+    rng = np.random.default_rng(seed)
+    n_hold = round(frac * len(ids_sorted))
+    hold = set(rng.choice(ids_sorted, size=n_hold, replace=False).tolist())
+    keep_mask = np.array([i not in hold for i in train.ids])
+    kept = SplitArrays(
+        ids=[i for i, m in zip(train.ids, keep_mask, strict=True) if m],
+        x=train.x[keep_mask],
+        y=train.y[keep_mask],
+        missing=train.missing,
+    )
+    return kept, sorted(hold)
 
 
 def main() -> None:
@@ -42,6 +67,16 @@ def main() -> None:
         if arrays.missing:
             print(f"WARNING: {name} missing {len(arrays.missing)} structures "
                   f"(e.g. {arrays.missing[:5]}); training on {len(arrays.ids)}.")
+
+    if config.cal_holdout_frac > 0.0:
+        train, holdout_ids = carve_calibration_holdout(
+            train, config.cal_holdout_frac, config.cal_holdout_seed
+        )
+        config.output_dir.mkdir(parents=True, exist_ok=True)
+        holdout_path = config.output_dir / "cal_holdout_ids.json"
+        holdout_path.write_text(json.dumps(holdout_ids, indent=2))
+        print(f"Q1 hold-out: reserved {len(holdout_ids)} train complexes for calibration "
+              f"-> {holdout_path} (training on {len(train.ids)})")
 
     device = default_device()
     print(f"device={device.type} | train={len(train.ids)} val={len(val.ids)} "

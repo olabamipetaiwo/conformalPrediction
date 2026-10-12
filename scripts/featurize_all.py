@@ -25,7 +25,7 @@ def run(name: str, records, featurizer) -> None:
         try:
             featurize_complex(r, featurizer=featurizer)
             ok += 1
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             fails.append((r.pdbid, type(e).__name__, str(e)[:100]))
     dt = time.perf_counter() - t0
     print(f"[{name:6}] featurized={ok}  failed={len(fails)}  ({dt:.1f}s)")
@@ -40,10 +40,10 @@ def main() -> None:
     splits, _ = load_lp_pdbbind_splits()
     lp_idx = index_structures(P_L)
     print(f"P-L indexed: {len(lp_idx)} structures\n")
-    for name in ("train", "val", "test"):
+    for name in ("train", "val", "test", "peptides_nc"):
         ids = list(splits[name].index)
         records, missing = records_for_ids(ids, lp_idx)
-        print(f"[{name:6}] labels={len(ids)}  resolved={len(records)}  no-structure={len(missing)}")
+        print(f"[{name:11}] labels={len(ids)}  resolved={len(records)}  no-structure={len(missing)}")
         run(name, records, feat)
 
     print()
